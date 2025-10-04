@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Yavalath（4並べ勝ち／3並べ負け）完全版</title>
+<title>Yavalath</title>
 <style>
   body{margin:0;font-family:sans-serif;background:#f4f5f7;display:flex;flex-direction:column;align-items:center}
   .board-wrap{width:min(900px,96vw);aspect-ratio:1/1;background:#1a1c1f;border-radius:22px;margin:8px;position:relative}
@@ -29,6 +29,7 @@
     <option value="easy">弱</option>
     <option value="medium">中</option>
     <option value="hard">強</option>
+    <option value="oni">鬼</option>
   </select>
   <button id="undoBtn">1手戻す</button>
   <button id="resetBtn">リセット</button>
@@ -40,11 +41,13 @@
 </div>
 
 <script>
+// 基本設定
 const RADIUS=5, HEX_SIZE=42, DIRS=[[1,0],[0,1],[1,-1]];
 let boardState=new Map(),current='white',history=[],gameOver=false,endMessage='',score={white:0,yellow:0},aiLevel='off';
 const svg=document.getElementById('board');
-const key=(q,r)=>`${q},${r}`; const parseKey=k=>k.split(',').map(Number);
+const key=(q,r)=>`${q},${r}`;
 
+// 座標変換
 function axialToPixel(q,r,size){return[size*Math.sqrt(3)*(q+r/2),size*1.5*r];}
 function hexPath(cx,cy,size){let pts=[];for(let i=0;i<6;i++){let a=Math.PI/180*(60*i-30);pts.push([cx+size*Math.cos(a),cy+size*Math.sin(a)]);}return "M"+pts.map(p=>p.join(",")).join("L")+"Z";}
 function computeLayout(){let xs=[],ys=[];for(let r=-RADIUS+1;r<=RADIUS-1;r++)for(let q=-RADIUS+1;q<=RADIUS-1;q++)if(Math.abs(q+r)<=RADIUS-1){let[x,y]=axialToPixel(q,r,HEX_SIZE);xs.push(x);ys.push(y);}let minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys),pad=70;let scX=(1000-pad*2)/(maxX-minX),scY=(1000-pad*2)/(maxY-minY);let scale=Math.min(scX,scY);let offX=(1000-(maxX-minX)*scale)/2-minX*scale,offY=(1000-(maxY-minY)*scale)/2-minY*scale;return{scale,offX,offY};}
@@ -86,139 +89,48 @@ function undo(){if(history.length===0)return;const last=history.pop();boardState
 
 function longestLenAt(state,q,r,pl){function count(sq,sr,d){let n=0,cq=sq,cr=sr;while(state.get(key(cq+d[0],cr+d[1]))===pl){cq+=d[0];cr+=d[1];n++;}return n;}let max=1;for(const d of DIRS){const len=1+count(q,r,d)+count(q,r,[-d[0],-d[1]]);if(len>max)max=len;}return max;}
 function makesExact3(state,q,r,pl){function count(sq,sr,d){let n=0,cq=sq,cr=sr;while(state.get(key(cq+d[0],cr+d[1]))===pl){cq+=d[0];cr+=d[1];n++;}return n;}for(const d of DIRS){const len=1+count(q,r,d)+count(q,r,[-d[0],-d[1]]);if(len===3)return true;}return false;}
-function cloneState(s=boardState){return new Map(s);}
-function applyMove(state,q,r,pl){let ns=cloneState(state);ns.set(key(q,r),pl);return ns;}
+function cloneState(s=boardState){return new Map(s);} function applyMove(state,q,r,pl){let ns=cloneState(state);ns.set(key(q,r),pl);return ns;}
+function legalMoves(state=boardState){const arr=[];for(let r=-RADIUS+1;r<=RADIUS-1;r++)for(let q=-RADIUS+1;q<=RADIUS-1;q++)if(Math.abs(q+r)<=RADIUS-1&&!state.has(key(q,r)))arr.push([q,r]);return arr;}
 
 function aiMove(){
-  // ===== 改良AI：戦術 + αβ探索（難易度で深さ可変） =====
   const ME='yellow', OP='white';
-  const movesAll = legalMoves();
-  if(movesAll.length===0) return;
+  const all=legalMoves(); if(all.length===0) return;
+  for(const [q,r] of all){const ns=applyMove(boardState,q,r,ME);if(longestLenAt(ns,q,r,ME)>=4) return place(q,r);} // 即勝ち
+  let moves=all.filter(([q,r])=>!makesExact3(applyMove(boardState,q,r,ME),q,r,ME));
+  if(!moves.length) moves=all.slice();
 
-  // 1) 即勝ち（置いて4+）
-  for(const [q,r] of movesAll){ const ns=applyMove(boardState,q,r,ME); if(longestLenAt(ns,q,r,ME) >= 4) return place(q,r); }
+  function oppImmediateWin(state){for(const [oq,or] of legalMoves(state)){const ns=applyMove(state,oq,or,OP);if(longestLenAt(ns,oq,or,OP)>=4) return [oq,or];}return null;}
+  const threat=oppImmediateWin(boardState);
+  if(threat){const blk=moves.find(([q,r])=>q===threat[0]&&r===threat[1]); if(blk) return place(...blk);}
 
-  // 2) 自爆（三連ちょうど）を避けた候補
-  let moves = movesAll.filter(([q,r]) => !makesExact3(applyMove(boardState,q,r,ME), q, r, ME));
-  if(moves.length===0) moves = movesAll.slice();
+  function centerW(q,r){return -(q*q+r*r);}
+  function heuristic(state){let s=0;for(const [k,v] of state.entries()){const [q,r]=k.split(',').map(Number);const len=longestLenAt(state,q,r,v);const cw=centerW(q,r)/10;const atom=(len===3?7:len*3)+cw;s+=v===ME?atom:-atom;}const t=oppImmediateWin(state);if(t) s-=60;return s;}
+  function makesLose(state,q,r,pl){const w=longestLenAt(state,q,r,pl)>=4;const l=!w&&makesExact3(state,q,r,pl);return{win:w,lose:l};}
+  function orderedMoves(state,pl){const ms=legalMoves(state).map(([q,r])=>{const ns=applyMove(state,q,r,pl);return{q,r,len:longestLenAt(ns,q,r,pl),cent:centerW(q,r)};});ms.sort((a,b)=> (b.len-a.len)||(b.cent-a.cent));return ms.map(m=>[m.q,m.r]);}
 
-  // 3) 相手の即勝ちをブロック（相手が次に4+を作れる点を塞ぐ）
-  //    ブロックできる手が複数ある場合は後続探索で選ぶ
-  function opponentHasImmediateWin(state){
-    for(const [oq,or] of legalMoves(state)){
-      const ns2 = applyMove(state, oq, or, OP);
-      if(longestLenAt(ns2, oq, or, OP) >= 4) return [oq,or];
-    }
-    return null;
-  }
-  const threat = opponentHasImmediateWin(boardState);
-  if(threat){
-    // ブロック可能な着手に絞る
-    const blockers = moves.filter(([q,r])=> q===threat[0] && r===threat[1]);
-    if(blockers.length){ return place(...blockers[0]); }
-  }
+  const baseDepth=(aiLevel==='easy')?1:(aiLevel==='medium')?2:(aiLevel==='hard')?3:4;
+  const TIME_LIMIT_MS=(aiLevel==='oni')?1000:300;
+  const startTime=performance.now();
 
-  // 4) 難易度別：
-  if(aiLevel==='easy'){
-    // ランダム（ただし自爆は避け済み）
-    const m = moves[Math.floor(Math.random()*moves.length)];
-    return place(...m);
-  }
-
-  // ===== 評価・探索 =====
-  // 中央寄り・連結伸長・相手即勝リスク回避を重視
-  function centerWeight(q,r){ return - (q*q + r*r); } // 中央ほど高評価（負の距離）
-  function heuristic(state){
-    let score = 0;
-    for(const [k,v] of state.entries()){
-      const [q,r] = k.split(',').map(Number);
-      const len = longestLenAt(state,q,r,v);
-      const cw = centerWeight(q,r)/10;
-      if(v===ME){ score += (len===3?7:len*3) + cw; }
-      else      { score -= (len===3?7:len*3) + cw; }
-    }
-    // 相手の即勝ち脅威がある局面は減点
-    const t = opponentHasImmediateWin(state);
-    if(t) score -= 50;
-    return score;
-  }
-
-  function makesLose(state,q,r,pl){
-    // Yavalathは「4+で勝ち」「4未満で3ちょうどは負け」
-    const w = longestLenAt(state,q,r,pl) >= 4;
-    const l = (!w) && makesExact3(state,q,r,pl);
-    return {win:w, lose:l};
-  }
-
-  // Move ordering（自分の連結が伸びる順 + 中央寄り）
-  function orderedMoves(state, pl){
-    const ms = legalMoves(state).map(([q,r])=>{
-      const ns = applyMove(state,q,r,pl);
-      const len = longestLenAt(ns,q,r,pl);
-      return {q,r,len,cent:centerWeight(q,r)};
-    });
-    ms.sort((a,b)=> (b.len-a.len) || (b.cent-a.cent));
-    return ms.map(m=>[m.q,m.r]);
-  }
-
-  // αβ探索（深さ可変）
-  const DEPTH = (aiLevel==='medium') ? 2 : 3; // medium=2, hard=3
-
-  function minimax(state, depth, alpha, beta, toMove /* 'yellow' or 'white' */){
-    // 探索打ち切り
+  function minimax(state,depth,alpha,beta,toMove){
     if(depth===0) return heuristic(state);
+    const meTurn=(toMove===ME); const ms=orderedMoves(state,toMove);
+    if(meTurn){let best=-1e9;for(const [q,r] of ms){const ns=applyMove(state,q,r,toMove);const res=makesLose(ns,q,r,toMove);let val;if(res.win) val=9999;else if(res.lose) val=-9999;else val=minimax(ns,depth-1,alpha,beta,OP);best=Math.max(best,val);alpha=Math.max(alpha,val);if(beta<=alpha) break;if(performance.now()-startTime>TIME_LIMIT_MS) break;}return best;}
+    else{let best=1e9;for(const [q,r] of ms){const ns=applyMove(state,q,r,toMove);const res=makesLose(ns,q,r,toMove);let val;if(res.win) val=-9999;else if(res.lose) val=9999;else val=minimax(ns,depth-1,alpha,beta,ME);best=Math.min(best,val);beta=Math.min(beta,val);if(beta<=alpha) break;if(performance.now()-startTime>TIME_LIMIT_MS) break;}return best;}}
 
-    const meTurn = (toMove===ME);
-    const ms = orderedMoves(state, toMove);
-
-    if(meTurn){
-      let best = -1e9;
-      for(const [q,r] of ms){
-        const ns = applyMove(state,q,r,toMove);
-        const res = makesLose(ns,q,r,toMove);
-        let val;
-        if(res.win) val = 9999;           // 直勝ち
-        else if(res.lose) val = -9999;     // 自爆
-        else val = minimax(ns, depth-1, alpha, beta, OP);
-        best = Math.max(best, val); alpha = Math.max(alpha, val);
-        if(beta<=alpha) break; // 枝刈り
-      }
-      return best;
-    }else{
-      let best = 1e9;
-      for(const [q,r] of ms){
-        const ns = applyMove(state,q,r,toMove);
-        const res = makesLose(ns,q,r,toMove);
-        let val;
-        if(res.win) val = -9999;           // 相手の直勝ちはこちらにとって最悪
-        else if(res.lose) val = 9999;      // 相手が自爆
-        else val = minimax(ns, depth-1, alpha, beta, ME);
-        best = Math.min(best, val); beta = Math.min(beta, val);
-        if(beta<=alpha) break;
-      }
-      return best;
+  let bestMove=null,bestVal=-1e9;const ordered0=orderedMoves(boardState,ME);
+  for(let D=1;D<=baseDepth;D++){
+    for(const [q,r] of ordered0){const ns=applyMove(boardState,q,r,ME);if(makesExact3(ns,q,r,ME)) continue;const val=minimax(ns,D-1,-1e9,1e9,OP);if(val>bestVal){bestVal=val;bestMove=[q,r];}if(performance.now()-startTime>TIME_LIMIT_MS) break;}
+    if(performance.now()-startTime>TIME_LIMIT_MS) break;
+  }
+  if(aiLevel==='oni'){
+    for(let D=baseDepth+1;D<=6;D++){
+      for(const [q,r] of ordered0){const ns=applyMove(boardState,q,r,ME);if(makesExact3(ns,q,r,ME)) continue;const val=minimax(ns,D-1,-1e9,1e9,OP);if(val>bestVal){bestVal=val;bestMove=[q,r];}if(performance.now()-startTime>TIME_LIMIT_MS) break;}
+      if(performance.now()-startTime>TIME_LIMIT_MS) break;
     }
   }
-
-  // 探索開始
-  let bestMove = null, bestVal = -1e9;
-  const ms = orderedMoves(boardState, ME).slice(0, 14); // 候補を少し絞って高速化
-  for(const [q,r] of ms){
-    // 自爆はスキップ（保険）
-    const ns = applyMove(boardState,q,r,ME);
-    if(makesExact3(ns,q,r,ME)) continue;
-    const val = minimax(ns, DEPTH-1, -1e9, 1e9, OP);
-    if(val > bestVal){ bestVal = val; bestMove = [q,r]; }
-  }
-
-  if(!bestMove){ // 予防線：全て同値ならランダム安全手
-    const m = moves[Math.floor(Math.random()*moves.length)];
-    return place(...m);
-  }
-  return place(...bestMove);
+  if(!bestMove){const m=moves[Math.floor(Math.random()*moves.length)];return place(...m);}return place(...bestMove);
 }
-
-function legalMoves(state=boardState){const arr=[];for(let r=-RADIUS+1;r<=RADIUS-1;r++)for(let q=-RADIUS+1;q<=RADIUS-1;q++)if(Math.abs(q+r)<=RADIUS-1&&!state.has(key(q,r)))arr.push([q,r]);return arr;}
 
 document.getElementById('resetBtn').onclick=reset;
 document.getElementById('undoBtn').onclick=undo;
