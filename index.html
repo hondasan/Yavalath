@@ -1,97 +1,61 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Yavalath（4並べ勝ち／3並べ負け）</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Yavalath（4並べ勝ち／3並べ負け）修正版</title>
 <style>
   :root{
     --bg:#f4f5f7;
-    --board:#222;          /* 盤背景 */
-    --grid:#50565e;        /* 六角の枠線 */
-    --hint:#6b7280;        /* 空セルの薄い色 */
-    --white:#ffffff;
+    --grid:#738194;        /* 六角の枠線（少し明るめ） */
+    --white:#fff;
     --yellow:#f6c40c;
     --shadow:rgba(0,0,0,.18);
-    --accent:#111;
   }
   *{box-sizing:border-box}
   body{
     margin:0;
     background:var(--bg);
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Hiragino Sans",
-                 "Noto Sans JP", "Yu Gothic UI", "YuGothic", "Meiryo", sans-serif;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Hiragino Sans","Noto Sans JP","Yu Gothic UI","YuGothic","Meiryo",sans-serif;
     color:#111;
-    display:flex;
-    min-height:100svh;
-    flex-direction:column;
-    align-items:center;
-    gap:10px;
+    display:flex; min-height:100svh; flex-direction:column; align-items:center; gap:10px;
   }
   header{
     width:min(900px,96vw);
     padding:10px 14px;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:10px;
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
   }
-  #turn{
-    font-weight:700;
-    font-size: clamp(16px, 4vw, 22px);
-    display:flex; align-items:center; gap:10px;
-  }
-  .badge{
-    display:inline-flex; align-items:center; justify-content:center;
-    width:1.4em; height:1.4em; border-radius:50%;
-    box-shadow: 0 2px 6px var(--shadow) inset, 0 1px 0 #fff4;
-    border:1px solid #0003;
-  }
-  .b-white{background:var(--white)}
-  .b-yellow{background:var(--yellow)}
-  #info{opacity:.8; font-size:.95rem}
-  .toolbar{
-    display:flex; gap:10px; flex-wrap:wrap;
-  }
-  button{
-    appearance:none; border:none; border-radius:12px;
-    padding:10px 14px; font-size:16px; font-weight:700;
-    background:#fff; box-shadow:0 2px 10px var(--shadow);
-  }
-  button:active{transform:translateY(1px)}
-  button:disabled{opacity:.5}
-  .danger{background:#ffeaea}
-  .primary{background:#eaf3ff}
+  #turn{font-weight:700; font-size:clamp(16px,4vw,22px); display:flex; align-items:center; gap:10px;}
+  .badge{display:inline-flex; align-items:center; justify-content:center; width:1.4em; height:1.4em; border-radius:50%; box-shadow:0 2px 6px var(--shadow) inset,0 1px 0 #fff4; border:1px solid #0003;}
+  .b-white{background:var(--white)} .b-yellow{background:var(--yellow)}
+  .toolbar{display:flex; gap:10px; flex-wrap:wrap;}
+  button{appearance:none; border:none; border-radius:12px; padding:10px 14px; font-size:16px; font-weight:700; background:#fff; box-shadow:0 2px 10px var(--shadow);}
+  button:active{transform:translateY(1px)} button:disabled{opacity:.5}
+  .danger{background:#ffeaea} .primary{background:#eaf3ff}
 
-  /* 盤コンテナ（縦横比をきれいに保つ） */
   .board-wrap{
     width:min(900px,96vw);
     aspect-ratio:1/1;
-    background: radial-gradient(120% 120% at 50% 50%, #333 0%, #1d1f22 60%, #15171a 100%);
+    background:#1a1c1f;
     border-radius:22px;
-    box-shadow: 0 10px 30px var(--shadow), inset 0 0 0 2px #0008;
-    padding: clamp(6px, 1.2vw, 10px);
+    box-shadow:0 10px 30px var(--shadow), inset 0 0 0 2px #0008;
+    padding:clamp(6px,1.2vw,10px);
   }
   svg{width:100%; height:100%; touch-action:manipulation; display:block}
 
   /* 六角セル */
   .hex{
-    fill:#2a2f35;
+    fill:#242a31;                     /* 少し明るめに */
     stroke:var(--grid);
-    stroke-width:1.4;
-    transition:transform .08s ease;
+    stroke-width:2.2;                 /* 線を太めに */
+    transition:filter .08s ease;
   }
-  .hex.empty{ fill:#2d3138; }
-  .hex.empty:is(:hover,.hover){ filter:brightness(1.15) }
+  .hex.empty:hover,.hex.hover{ filter:brightness(1.18); cursor:pointer; }
   .hex.blocked{ opacity:.35; }
 
-  /* 石（影をつけて立体感） */
-  .stone{
-    filter: drop-shadow(0 2px 2px rgba(0,0,0,.35));
-  }
-  .stone circle{
-    stroke:#0006; stroke-width:1.5;
-  }
+  /* 石（影をつける） */
+  .stone{ filter:drop-shadow(0 2px 2px rgba(0,0,0,.35)); }
+  .stone circle{ stroke:#0006; stroke-width:1.5; }
   .stone.white circle{ fill:var(--white) }
   .stone.yellow circle{ fill:var(--yellow) }
   .last-move circle{ stroke:#1a73e8; stroke-width:3 }
@@ -115,250 +79,200 @@
     <svg id="board" viewBox="0 0 1000 1000" aria-label="Yavalath board"></svg>
   </div>
 
-  <div id="info">ルール：4つ並べたら勝ち。3つ並べたら負け（ただし同時に4以上ができたら勝ち）。</div>
-  <footer>スマホ1台で交互にタップして遊べます。</footer>
+  <footer>ルール：4つ並べたら勝ち。4未満で3つ並べたらその手番の負け（4以上が同時にできた場合は勝ち）。</footer>
 
 <script>
-/* ============== 盤と座標 ============== */
-// 半径（side length）。標準は5（全61セル）
-const RADIUS = 5; // 4なら37セル、5なら61セル
-const HEX_SIZE = 42; // 1ヘクスのピクセル半径（自動縮尺されます）
+/* ===== 設定 ===== */
+const RADIUS = 5;       // 盤の半径（5=全61セル）
+const HEX_SIZE = 42;    // 1ヘクスの元サイズ
+const DIRS = [[1,0],[0,1],[1,-1]]; // 3軸
 
-// axial座標(q,r)のキー化
-const key = (q,r)=> `${q},${r}`;
-const parseKey = k => k.split(',').map(Number);
-
-// 3軸（axial基準）の方向ベクトル
-const DIRS = [
-  [1,0], [0,1], [1,-1]
-];
-
-/* ============== レイアウト計算 ============== */
+/* ===== 盤の状態 ===== */
 const svg = document.getElementById('board');
 let boardState = new Map(); // "q,r" => "white"/"yellow"
 let current = 'white';
-let history = []; // [{k,player}]
+let history = [];
 let gameOver = false;
+let endMessage = '';
+const key = (q,r)=>`${q},${r}`;
+const parseKey = k => k.split(',').map(Number);
 
-// 中心を盤中央にくるように座標→px変換（pointy-top）
+/* ===== Axial座標 → ピクセル ===== */
 function axialToPixel(q,r,size){
   const x = size * Math.sqrt(3) * (q + r/2);
   const y = size * 3/2 * r;
   return [x,y];
 }
-// 盤全体を真ん中に収めるためのオフセット
-function computeBoardOrigin(){
-  // 範囲のmin/maxを調べて中央寄せ
-  let xs=[], ys=[];
-  for(let r=-RADIUS+1; r<=RADIUS-1; r++){
-    for(let q=-RADIUS+1; q<=RADIUS-1; q++){
-      if(Math.abs(q+r) <= RADIUS-1){
-        const [x,y] = axialToPixel(q,r,HEX_SIZE);
+function hexPath(cx,cy,size){
+  const pts=[];
+  for(let i=0;i<6;i++){
+    const ang = Math.PI/180*(60*i-30);
+    pts.push([cx+size*Math.cos(ang), cy+size*Math.sin(ang)]);
+  }
+  return "M"+pts.map(p=>p.map(n=>n.toFixed(2)).join(",")).join("L")+"Z";
+}
+function computeLayout(){
+  let xs=[],ys=[];
+  for(let r=-RADIUS+1;r<=RADIUS-1;r++){
+    for(let q=-RADIUS+1;q<=RADIUS-1;q++){
+      if(Math.abs(q+r)<=RADIUS-1){
+        const [x,y]=axialToPixel(q,r,HEX_SIZE);
         xs.push(x); ys.push(y);
       }
     }
   }
-  const minX = Math.min(...xs), maxX = Math.max(...xs);
-  const minY = Math.min(...ys), maxY = Math.max(...ys);
-  const pad = 70; // 外枠の余白
-  const scaleX = (1000 - pad*2) / (maxX-minX);
-  const scaleY = (1000 - pad*2) / (maxY-minY);
-  const scale = Math.min(scaleX, scaleY);
-  const offX = (1000 - (maxX-minX)*scale)/2 - minX*scale;
-  const offY = (1000 - (maxY-minY)*scale)/2 - minY*scale;
-  return {scale, offX, offY};
+  const minX=Math.min(...xs), maxX=Math.max(...xs);
+  const minY=Math.min(...ys), maxY=Math.max(...ys);
+  const pad=70;
+  const scX=(1000-pad*2)/(maxX-minX);
+  const scY=(1000-pad*2)/(maxY-minY);
+  const scale=Math.min(scX,scY);
+  const offX=(1000-(maxX-minX)*scale)/2 - minX*scale;
+  const offY=(1000-(maxY-minY)*scale)/2 - minY*scale;
+  return {scale,offX,offY};
 }
-const layout = computeBoardOrigin();
+const L = computeLayout();
 
-function hexPolygonPath(cx,cy,size){
-  // pointy-top 六角形の6頂点
-  const pts=[];
-  for(let i=0;i<6;i++){
-    const angle = Math.PI/180 * (60*i - 30);
-    pts.push([cx + size*Math.cos(angle), cy + size*Math.sin(angle)]);
-  }
-  return "M"+pts.map(p=>p.map(x=>x.toFixed(2)).join(",")).join("L")+"Z";
-}
-
-/* ============== 盤描画 ============== */
+/* ===== 描画 ===== */
 function render(){
   svg.innerHTML = '';
-  const gGrid = document.createElementNS("http://www.w3.org/2000/svg", "g");
-  const gStones = document.createElementNS("http://www.w3.org/2000/svg", "g");
-  svg.appendChild(gGrid);
-  svg.appendChild(gStones);
 
-  // 背景円
-  const bg = document.createElementNS("http://www.w3.org/2000/svg","circle");
-  bg.setAttribute('cx','500'); bg.setAttribute('cy','500');
-  bg.setAttribute('r','480'); bg.setAttribute('fill','url(#bgGrad)');
-  svg.appendChild(bg);
-
-  // グラデ定義
+  // 1) defs と 背景を「先」に配置（＝最背面）
   const defs = document.createElementNS("http://www.w3.org/2000/svg","defs");
   defs.innerHTML = `
     <radialGradient id="bgGrad" cx="50%" cy="50%" r="60%">
-      <stop offset="0%" stop-color="#222"/>
-      <stop offset="70%" stop-color="#1a1c1f"/>
-      <stop offset="100%" stop-color="#111315"/>
-    </radialGradient>
-  `;
+      <stop offset="0%"  stop-color="#2a2c30"/>
+      <stop offset="70%" stop-color="#1d1f23"/>
+      <stop offset="100%" stop-color="#131518"/>
+    </radialGradient>`;
   svg.appendChild(defs);
 
-  // 盤ヘクス
-  const cellElements = {};
-  for(let r=-RADIUS+1; r<=RADIUS-1; r++){
-    for(let q=-RADIUS+1; q<=RADIUS-1; q++){
-      if(Math.abs(q+r) <= RADIUS-1){
-        const [px,py] = axialToPixel(q,r,HEX_SIZE);
-        const cx = layout.offX + px*layout.scale;
-        const cy = layout.offY + py*layout.scale;
-        const s  = HEX_SIZE * .96 * layout.scale; // 少し狭める
-        const path = hexPolygonPath(cx,cy,s);
+  const bg = document.createElementNS("http://www.w3.org/2000/svg","circle");
+  bg.setAttribute('cx','500'); bg.setAttribute('cy','500'); bg.setAttribute('r','480');
+  bg.setAttribute('fill','url(#bgGrad)');
+  bg.setAttribute('pointer-events','none');     // ← 背景でタップを遮らない
+  svg.appendChild(bg);
 
-        const h = document.createElementNS("http://www.w3.org/2000/svg","path");
-        h.setAttribute('d', path);
-        h.classList.add('hex');
+  // 2) グリッドと石のグループをその上に
+  const gGrid = document.createElementNS("http://www.w3.org/2000/svg","g");
+  const gStones = document.createElementNS("http://www.w3.org/2000/svg","g");
+  svg.appendChild(gGrid); svg.appendChild(gStones);
 
-        const k = key(q,r);
+  const centers = {};
+  for(let r=-RADIUS+1;r<=RADIUS-1;r++){
+    for(let q=-RADIUS+1;q<=RADIUS-1;q++){
+      if(Math.abs(q+r)<=RADIUS-1){
+        const [px,py]=axialToPixel(q,r,HEX_SIZE);
+        const cx=L.offX+px*L.scale, cy=L.offY+py*L.scale;
+        const s=HEX_SIZE*.96*L.scale;
+        const p=document.createElementNS("http://www.w3.org/2000/svg","path");
+        p.setAttribute('d',hexPath(cx,cy,s));
+        p.classList.add('hex');
+        const k=key(q,r);
         if(!boardState.has(k)){
-          h.classList.add('empty');
-          h.addEventListener('pointerenter', ()=> h.classList.add('hover'));
-          h.addEventListener('pointerleave', ()=> h.classList.remove('hover'));
-          h.addEventListener('click', ()=> place(q,r));
+          p.classList.add('empty');
+          p.addEventListener('pointerenter',()=>p.classList.add('hover'));
+          p.addEventListener('pointerleave',()=>p.classList.remove('hover'));
+          p.addEventListener('click',()=>place(q,r));
         }else{
-          h.classList.add('occupied');
-          h.classList.add('blocked');
+          p.classList.add('blocked');
         }
-        gGrid.appendChild(h);
-        cellElements[k]=[cx,cy];
+        gGrid.appendChild(p);
+        centers[k]=[cx,cy];
       }
     }
   }
 
   // 石
-  let last = history.length ? history[history.length-1].k : null;
+  let last = history.length? history[history.length-1].k : null;
   for(const [k,v] of boardState.entries()){
-    const [q,r] = parseKey(k);
-    const [cx,cy] = cellElements[k];
-    const stone = document.createElementNS("http://www.w3.org/2000/svg","g");
-    stone.setAttribute('class', `stone ${v} ${k===last?'last-move':''}`);
-    const circle = document.createElementNS("http://www.w3.org/2000/svg","circle");
-    circle.setAttribute('cx', cx);
-    circle.setAttribute('cy', cy);
-    circle.setAttribute('r', HEX_SIZE*.70*layout.scale);
-    stone.appendChild(circle);
-    gStones.appendChild(stone);
+    const [cx,cy]=centers[k];
+    const g=document.createElementNS("http://www.w3.org/2000/svg","g");
+    g.setAttribute('class',`stone ${v} ${k===last?'last-move':''}`);
+    const c=document.createElementNS("http://www.w3.org/2000/svg","circle");
+    c.setAttribute('cx',cx); c.setAttribute('cy',cy);
+    c.setAttribute('r',HEX_SIZE*.70*L.scale);
+    g.appendChild(c);
+    gStones.appendChild(g);
   }
 
   // ヘッダ更新
-  const badge = document.getElementById('turnBadge');
-  const text = document.getElementById('turnText');
-  badge.className = `badge ${current==='white'?'b-white':'b-yellow'}`;
-  if(gameOver){
-    text.textContent = endMessage;
-  }else{
-    text.textContent = (current==='white'?'白':'黄') + 'の番です';
-  }
+  const badge=document.getElementById('turnBadge');
+  const text=document.getElementById('turnText');
+  badge.className=`badge ${current==='white'?'b-white':'b-yellow'}`;
+  text.textContent = gameOver ? endMessage : (current==='white'?'白':'黄')+'の番です';
   document.getElementById('undoBtn').disabled = history.length===0 || gameOver;
 }
-let endMessage = '';
 
-/* ============== 勝敗判定 ============== */
-function countInDir(q,r,dir,player){
-  let n=0, cq=q, cr=r;
+/* ===== 判定 ===== */
+function countDir(q,r,[dq,dr],pl){
+  let n=0; let cq=q, cr=r;
   while(true){
-    cq+=dir[0]; cr+=dir[1];
-    if(boardState.get(key(cq,cr))===player) n++; else break;
+    cq+=dq; cr+=dr;
+    if(boardState.get(key(cq,cr))===pl) n++; else break;
   }
   return n;
 }
-function longestThrough(q,r,player){
-  // 3軸の最大連結長（置いた石を含む）
-  let maxLen=1;
+function longest(q,r,pl){
+  let m=1;
   for(const d of DIRS){
-    const len = 1 + countInDir(q,r,d,player) + countInDir(q,r,[-d[0],-d[1]],player);
-    if(len>maxLen) maxLen=len;
+    const len = 1 + countDir(q,r,d,pl) + countDir(q,r,[-d[0],-d[1]],pl);
+    if(len>m) m=len;
   }
-  return maxLen;
+  return m;
 }
-function hasExactly3Line(q,r,player){
-  // いずれかの軸で ちょうど3連（置いた石を含む）ができたか
-  // ※別方向の分岐を合算しない（連続のみ）
+function hasExact3(q,r,pl){
   for(const d of DIRS){
-    const len = 1 + countInDir(q,r,d,player) + countInDir(q,r,[-d[0],-d[1]],player);
-    if(len === 3) return true;
+    const len = 1 + countDir(q,r,d,pl) + countDir(q,r,[-d[0],-d[1]],pl);
+    if(len===3) return true;
   }
   return false;
 }
 
-/* ============== 着手処理 ============== */
+/* ===== プレイ処理 ===== */
 function place(q,r){
   if(gameOver) return;
-  const k = key(q,r);
+  const k=key(q,r);
   if(boardState.has(k)) return;
-
   boardState.set(k,current);
   history.push({k,player:current});
 
-  // 勝敗：4以上ができたら勝ち。そうでなく 3ができたら負け。
-  const winLen = longestThrough(q,r,current);
-  if(winLen >= 4){
-    gameOver = true;
-    endMessage = (current==='white'?'白':'黄') + 'の勝ち！（4つ以上）';
-  }else if(hasExactly3Line(q,r,current)){
-    gameOver = true;
-    endMessage = (current==='white'?'白':'黄') + 'の負け（3つ並べてしまった）';
-  }else if (boardState.size === totalCells()){
-    gameOver = true;
-    endMessage = '引き分け';
+  const winLen = longest(q,r,current);
+  if(winLen>=4){
+    gameOver=true; endMessage=(current==='white'?'白':'黄')+'の勝ち！（4つ以上）';
+  }else if(hasExact3(q,r,current)){
+    gameOver=true; endMessage=(current==='white'?'白':'黄')+'の負け（3を作った）';
   }else{
-    current = (current==='white') ? 'yellow' : 'white';
+    current = (current==='white')?'yellow':'white';
   }
   render();
 }
-
-function totalCells(){
-  // 1 + 6 + 12 + ... for radius-1 rings
-  let r = RADIUS-1;
-  return 1 + 3*r*(r+1);
-}
-
-/* ============== 操作 ============== */
 function reset(all=true){
-  boardState.clear();
-  history = [];
-  gameOver = false;
-  endMessage = '';
-  if(all){ current = 'white'; }
+  boardState.clear(); history=[]; gameOver=false; endMessage='';
+  if(all) current='white';
   render();
 }
 function undo(){
   if(history.length===0 || gameOver) return;
-  const last = history.pop();
+  const last=history.pop();
   boardState.delete(last.k);
-  current = last.player; // 打った側の手番に戻す
-  gameOver = false; endMessage='';
+  current = last.player;
+  gameOver=false; endMessage='';
   render();
 }
 function swapFirst(){
-  if(history.length>0) return; // 対局中は不可
+  if(history.length>0) return;
   current = (current==='white')?'yellow':'white';
   render();
 }
 
-document.getElementById('resetBtn').addEventListener('click', ()=> reset(true));
-document.getElementById('undoBtn').addEventListener('click', undo);
-document.getElementById('swapBtn').addEventListener('click', swapFirst);
+/* ===== UIイベント ===== */
+document.getElementById('resetBtn').addEventListener('click',()=>reset(true));
+document.getElementById('undoBtn').addEventListener('click',undo);
+document.getElementById('swapBtn').addEventListener('click',swapFirst);
 
-// 初期描画
+/* 初期表示 */
 render();
-
-/* ============== 使い方メモ（任意で削除OK） ==============
-- RADIUS を 4/5/6 に変更すると盤サイズが変わります。
-- HEX_SIZE は見た目の基本サイズ。盤全体はSVG viewBoxで自動スケーリング。
-- 判定は「4以上ができたら勝ち」「そうでなければ3ちょうどができたら負け」。
-========================================================= */
 </script>
 </body>
 </html>
