@@ -3,275 +3,227 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Yavalath（4並べ勝ち／3並べ負け）修正版</title>
+<title>Yavalath（4並べ勝ち／3並べ負け）完全版</title>
 <style>
-  :root{
-    --bg:#f4f5f7;
-    --grid:#738194;        /* 六角の枠線（少し明るめ） */
-    --white:#fff;
-    --yellow:#f6c40c;
-    --shadow:rgba(0,0,0,.18);
-  }
-  *{box-sizing:border-box}
-  body{
-    margin:0;
-    background:var(--bg);
-    font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Hiragino Sans","Noto Sans JP","Yu Gothic UI","YuGothic","Meiryo",sans-serif;
-    color:#111;
-    display:flex; min-height:100svh; flex-direction:column; align-items:center; gap:10px;
-  }
-  header{
-    width:min(900px,96vw);
-    padding:10px 14px;
-    display:flex; align-items:center; justify-content:space-between; gap:10px;
-  }
-  #turn{font-weight:700; font-size:clamp(16px,4vw,22px); display:flex; align-items:center; gap:10px;}
-  .badge{display:inline-flex; align-items:center; justify-content:center; width:1.4em; height:1.4em; border-radius:50%; box-shadow:0 2px 6px var(--shadow) inset,0 1px 0 #fff4; border:1px solid #0003;}
-  .b-white{background:var(--white)} .b-yellow{background:var(--yellow)}
-  .toolbar{display:flex; gap:10px; flex-wrap:wrap;}
-  button{appearance:none; border:none; border-radius:12px; padding:10px 14px; font-size:16px; font-weight:700; background:#fff; box-shadow:0 2px 10px var(--shadow);}
-  button:active{transform:translateY(1px)} button:disabled{opacity:.5}
-  .danger{background:#ffeaea} .primary{background:#eaf3ff}
-
-  .board-wrap{
-    width:min(900px,96vw);
-    aspect-ratio:1/1;
-    background:#1a1c1f;
-    border-radius:22px;
-    box-shadow:0 10px 30px var(--shadow), inset 0 0 0 2px #0008;
-    padding:clamp(6px,1.2vw,10px);
-  }
-  svg{width:100%; height:100%; touch-action:manipulation; display:block}
-
-  /* 六角セル */
-  .hex{
-    fill:#242a31;                     /* 少し明るめに */
-    stroke:var(--grid);
-    stroke-width:2.2;                 /* 線を太めに */
-    transition:filter .08s ease;
-  }
-  .hex.empty:hover,.hex.hover{ filter:brightness(1.18); cursor:pointer; }
-  .hex.blocked{ opacity:.35; }
-
-  /* 石（影をつける） */
-  .stone{ filter:drop-shadow(0 2px 2px rgba(0,0,0,.35)); }
-  .stone circle{ stroke:#0006; stroke-width:1.5; }
-  .stone.white circle{ fill:var(--white) }
-  .stone.yellow circle{ fill:var(--yellow) }
-  .last-move circle{ stroke:#1a73e8; stroke-width:3 }
-  footer{padding:10px 0 18px; opacity:.75; font-size:.9rem}
+  body{margin:0;font-family:sans-serif;background:#f4f5f7;display:flex;flex-direction:column;align-items:center}
+  .board-wrap{width:min(900px,96vw);aspect-ratio:1/1;background:#1a1c1f;border-radius:22px;margin:8px;position:relative}
+  svg{width:100%;height:100%}
+  .hex{fill:#242a31;stroke:#7f8ea3;stroke-width:2}
+  .hex.empty:hover{filter:brightness(1.2);cursor:pointer}
+  .stone circle{stroke:#0006;stroke-width:1.5}
+  .stone.white circle{fill:url(#marbleWhite)}
+  .stone.yellow circle{fill:url(#marbleYellow)}
+  .last-anim circle{animation:pop .2s ease-out forwards}
+  @keyframes pop{0%{transform:scale(0);opacity:.2}100%{transform:scale(1);opacity:1}}
+  .win-line{stroke:red;stroke-width:10;stroke-linecap:round;filter:drop-shadow(0 0 6px red);opacity:.85;animation:pulse 1s ease-in-out infinite}
+  @keyframes pulse{0%{opacity:.5}50%{opacity:1}100%{opacity:.5}}
+  #banner{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+  #bannerMsg{background:rgba(0,0,0,.6);color:#fff;padding:10px 14px;border-radius:12px;font-size:1.4rem}
 </style>
 </head>
 <body>
-  <header>
-    <div id="turn">
-      <span class="badge b-white" id="turnBadge"></span>
-      <span id="turnText">白の番です</span>
-    </div>
-    <div class="toolbar">
-      <button class="primary" id="undoBtn" title="一手戻す">◀︎ 一手戻す</button>
-      <button id="swapBtn" title="先手／後手を入れ替え">先手入れ替え</button>
-      <button class="danger" id="resetBtn" title="最初から">リセット</button>
-    </div>
-  </header>
-
-  <div class="board-wrap">
-    <svg id="board" viewBox="0 0 1000 1000" aria-label="Yavalath board"></svg>
-  </div>
-
-  <footer>ルール：4つ並べたら勝ち。4未満で3つ並べたらその手番の負け（4以上が同時にできた場合は勝ち）。</footer>
+<header>
+  <span id="turnText">白の番です</span>
+  <select id="aiLevel">
+    <option value="off">AI:OFF</option>
+    <option value="easy">弱</option>
+    <option value="medium">中</option>
+    <option value="hard">強</option>
+  </select>
+  <button id="undoBtn">1手戻す</button>
+  <button id="resetBtn">リセット</button>
+</header>
+<div id="score">白:0 勝 - 黄:0 勝</div>
+<div class="board-wrap">
+  <svg id="board" viewBox="0 0 1000 1000"></svg>
+  <div id="banner"><div id="bannerMsg"></div></div>
+</div>
 
 <script>
-/* ===== 設定 ===== */
-const RADIUS = 5;       // 盤の半径（5=全61セル）
-const HEX_SIZE = 42;    // 1ヘクスの元サイズ
-const DIRS = [[1,0],[0,1],[1,-1]]; // 3軸
+const RADIUS=5, HEX_SIZE=42, DIRS=[[1,0],[0,1],[1,-1]];
+let boardState=new Map(),current='white',history=[],gameOver=false,endMessage='',score={white:0,yellow:0},aiLevel='off';
+const svg=document.getElementById('board');
+const key=(q,r)=>`${q},${r}`; const parseKey=k=>k.split(',').map(Number);
 
-/* ===== 盤の状態 ===== */
-const svg = document.getElementById('board');
-let boardState = new Map(); // "q,r" => "white"/"yellow"
-let current = 'white';
-let history = [];
-let gameOver = false;
-let endMessage = '';
-const key = (q,r)=>`${q},${r}`;
-const parseKey = k => k.split(',').map(Number);
+function axialToPixel(q,r,size){return[size*Math.sqrt(3)*(q+r/2),size*1.5*r];}
+function hexPath(cx,cy,size){let pts=[];for(let i=0;i<6;i++){let a=Math.PI/180*(60*i-30);pts.push([cx+size*Math.cos(a),cy+size*Math.sin(a)]);}return "M"+pts.map(p=>p.join(",")).join("L")+"Z";}
+function computeLayout(){let xs=[],ys=[];for(let r=-RADIUS+1;r<=RADIUS-1;r++)for(let q=-RADIUS+1;q<=RADIUS-1;q++)if(Math.abs(q+r)<=RADIUS-1){let[x,y]=axialToPixel(q,r,HEX_SIZE);xs.push(x);ys.push(y);}let minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys),pad=70;let scX=(1000-pad*2)/(maxX-minX),scY=(1000-pad*2)/(maxY-minY);let scale=Math.min(scX,scY);let offX=(1000-(maxX-minX)*scale)/2-minX*scale,offY=(1000-(maxY-minY)*scale)/2-minY*scale;return{scale,offX,offY};}
+const L=computeLayout();
 
-/* ===== Axial座標 → ピクセル ===== */
-function axialToPixel(q,r,size){
-  const x = size * Math.sqrt(3) * (q + r/2);
-  const y = size * 3/2 * r;
-  return [x,y];
+let lastWinSegment=null;
+function render(){svg.innerHTML='';
+ let defs=document.createElementNS('http://www.w3.org/2000/svg','defs');
+ defs.innerHTML=`<radialGradient id="marbleWhite" r="100%"><stop offset="0%" stop-color="#fff"/><stop offset="100%" stop-color="#ddd"/></radialGradient>
+ <radialGradient id="marbleYellow" r="100%"><stop offset="0%" stop-color="#ffe079"/><stop offset="100%" stop-color="#caa200"/></radialGradient>`;
+ svg.appendChild(defs);
+ let centers={};
+ for(let r=-RADIUS+1;r<=RADIUS-1;r++)for(let q=-RADIUS+1;q<=RADIUS-1;q++)if(Math.abs(q+r)<=RADIUS-1){let[px,py]=axialToPixel(q,r,HEX_SIZE);let cx=L.offX+px*L.scale,cy=L.offY+py*L.scale;let s=HEX_SIZE*.96*L.scale;let p=document.createElementNS('http://www.w3.org/2000/svg','path');p.setAttribute('d',hexPath(cx,cy,s));p.classList.add('hex');let k=key(q,r);if(!boardState.has(k)){p.classList.add('empty');p.onclick=()=>place(q,r);}svg.appendChild(p);centers[k]=[cx,cy];}
+ let last=history.length?history[history.length-1].k:null;
+ for(const [k,v] of boardState.entries()){let[cx,cy]=centers[k];let g=document.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class',`stone ${v} ${k===last?'last-anim':''}`);let c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('cx',cx);c.setAttribute('cy',cy);c.setAttribute('r',HEX_SIZE*.70*L.scale);g.appendChild(c);svg.appendChild(g);} 
+ if(lastWinSegment){let l=document.createElementNS('http://www.w3.org/2000/svg','line');l.setAttribute('x1',lastWinSegment[0][0]);l.setAttribute('y1',lastWinSegment[0][1]);l.setAttribute('x2',lastWinSegment[1][0]);l.setAttribute('y2',lastWinSegment[1][1]);l.setAttribute('class','win-line');svg.appendChild(l);} 
+ document.getElementById('turnText').textContent=gameOver?endMessage:(current==='white'?'白':'黄')+'の番です';
+ document.getElementById('score').textContent=`白:${score.white} 勝 - 黄:${score.yellow} 勝`;
+ document.getElementById('banner').hidden=!gameOver;
+ document.getElementById('bannerMsg').textContent=endMessage;
 }
-function hexPath(cx,cy,size){
-  const pts=[];
-  for(let i=0;i<6;i++){
-    const ang = Math.PI/180*(60*i-30);
-    pts.push([cx+size*Math.cos(ang), cy+size*Math.sin(ang)]);
+
+function countDir(q,r,[dq,dr],pl){let n=0,cq=q,cr=r;while(boardState.get(key(cq+dq,cr+dr))===pl){cq+=dq;cr+=dr;n++;}return{n,cq,cr};}
+function longestInfo(q,r,pl){let best={len:1,dir:null,front:null,back:null};for(const d of DIRS){const f=countDir(q,r,d,pl),b=countDir(q,r,[-d[0],-d[1]],pl);let len=1+f.n+b.n;if(len>best.len)best={len,dir:d,front:f,back:b};}return best;}
+function exact3(q,r,pl){for(const d of DIRS){const f=countDir(q,r,d,pl),b=countDir(q,r,[-d[0],-d[1]],pl);if(1+f.n+b.n===3)return true;}return false;}
+function segmentForWin(q,r,info){const[dq,dr]=info.dir;const startQ=q-dq*info.back.n,startR=r-dr*info.back.n;const endQ=q+dq*info.front.n,endR=r+dr*info.front.n;const[sx,sy]=axialToPixel(startQ,startR,HEX_SIZE),[ex,ey]=axialToPixel(endQ,endR,HEX_SIZE);return[[L.offX+sx*L.scale,L.offY+sy*L.scale],[L.offX+ex*L.scale,L.offY+ey*L.scale]];}
+
+function place(q,r){if(gameOver)return;let k=key(q,r);if(boardState.has(k))return;boardState.set(k,current);history.push({k,player:current});
+ const info=longestInfo(q,r,current);
+ if(info.len>=4){gameOver=true;lastWinSegment=segmentForWin(q,r,info);endMessage=(current==='white'?'白':'黄')+'の勝ち！';score[current]++;}
+ else if(exact3(q,r,current)){gameOver=true;lastWinSegment=null;endMessage=(current==='white'?'白':'黄')+'の負け！';score[current==='white'?'yellow':'white']++;}
+ else current=current==='white'?'yellow':'white';
+ render();
+ if(!gameOver&&current==='yellow'&&aiLevel!=='off')setTimeout(aiMove,200);
+}
+
+function reset(){boardState.clear();history=[];gameOver=false;endMessage='';lastWinSegment=null;current='white';render();}
+function undo(){if(history.length===0)return;const last=history.pop();boardState.delete(last.k);current=last.player;gameOver=false;endMessage='';lastWinSegment=null;render();}
+
+function longestLenAt(state,q,r,pl){function count(sq,sr,d){let n=0,cq=sq,cr=sr;while(state.get(key(cq+d[0],cr+d[1]))===pl){cq+=d[0];cr+=d[1];n++;}return n;}let max=1;for(const d of DIRS){const len=1+count(q,r,d)+count(q,r,[-d[0],-d[1]]);if(len>max)max=len;}return max;}
+function makesExact3(state,q,r,pl){function count(sq,sr,d){let n=0,cq=sq,cr=sr;while(state.get(key(cq+d[0],cr+d[1]))===pl){cq+=d[0];cr+=d[1];n++;}return n;}for(const d of DIRS){const len=1+count(q,r,d)+count(q,r,[-d[0],-d[1]]);if(len===3)return true;}return false;}
+function cloneState(s=boardState){return new Map(s);}
+function applyMove(state,q,r,pl){let ns=cloneState(state);ns.set(key(q,r),pl);return ns;}
+
+function aiMove(){
+  // ===== 改良AI：戦術 + αβ探索（難易度で深さ可変） =====
+  const ME='yellow', OP='white';
+  const movesAll = legalMoves();
+  if(movesAll.length===0) return;
+
+  // 1) 即勝ち（置いて4+）
+  for(const [q,r] of movesAll){ const ns=applyMove(boardState,q,r,ME); if(longestLenAt(ns,q,r,ME) >= 4) return place(q,r); }
+
+  // 2) 自爆（三連ちょうど）を避けた候補
+  let moves = movesAll.filter(([q,r]) => !makesExact3(applyMove(boardState,q,r,ME), q, r, ME));
+  if(moves.length===0) moves = movesAll.slice();
+
+  // 3) 相手の即勝ちをブロック（相手が次に4+を作れる点を塞ぐ）
+  //    ブロックできる手が複数ある場合は後続探索で選ぶ
+  function opponentHasImmediateWin(state){
+    for(const [oq,or] of legalMoves(state)){
+      const ns2 = applyMove(state, oq, or, OP);
+      if(longestLenAt(ns2, oq, or, OP) >= 4) return [oq,or];
+    }
+    return null;
   }
-  return "M"+pts.map(p=>p.map(n=>n.toFixed(2)).join(",")).join("L")+"Z";
-}
-function computeLayout(){
-  let xs=[],ys=[];
-  for(let r=-RADIUS+1;r<=RADIUS-1;r++){
-    for(let q=-RADIUS+1;q<=RADIUS-1;q++){
-      if(Math.abs(q+r)<=RADIUS-1){
-        const [x,y]=axialToPixel(q,r,HEX_SIZE);
-        xs.push(x); ys.push(y);
+  const threat = opponentHasImmediateWin(boardState);
+  if(threat){
+    // ブロック可能な着手に絞る
+    const blockers = moves.filter(([q,r])=> q===threat[0] && r===threat[1]);
+    if(blockers.length){ return place(...blockers[0]); }
+  }
+
+  // 4) 難易度別：
+  if(aiLevel==='easy'){
+    // ランダム（ただし自爆は避け済み）
+    const m = moves[Math.floor(Math.random()*moves.length)];
+    return place(...m);
+  }
+
+  // ===== 評価・探索 =====
+  // 中央寄り・連結伸長・相手即勝リスク回避を重視
+  function centerWeight(q,r){ return - (q*q + r*r); } // 中央ほど高評価（負の距離）
+  function heuristic(state){
+    let score = 0;
+    for(const [k,v] of state.entries()){
+      const [q,r] = k.split(',').map(Number);
+      const len = longestLenAt(state,q,r,v);
+      const cw = centerWeight(q,r)/10;
+      if(v===ME){ score += (len===3?7:len*3) + cw; }
+      else      { score -= (len===3?7:len*3) + cw; }
+    }
+    // 相手の即勝ち脅威がある局面は減点
+    const t = opponentHasImmediateWin(state);
+    if(t) score -= 50;
+    return score;
+  }
+
+  function makesLose(state,q,r,pl){
+    // Yavalathは「4+で勝ち」「4未満で3ちょうどは負け」
+    const w = longestLenAt(state,q,r,pl) >= 4;
+    const l = (!w) && makesExact3(state,q,r,pl);
+    return {win:w, lose:l};
+  }
+
+  // Move ordering（自分の連結が伸びる順 + 中央寄り）
+  function orderedMoves(state, pl){
+    const ms = legalMoves(state).map(([q,r])=>{
+      const ns = applyMove(state,q,r,pl);
+      const len = longestLenAt(ns,q,r,pl);
+      return {q,r,len,cent:centerWeight(q,r)};
+    });
+    ms.sort((a,b)=> (b.len-a.len) || (b.cent-a.cent));
+    return ms.map(m=>[m.q,m.r]);
+  }
+
+  // αβ探索（深さ可変）
+  const DEPTH = (aiLevel==='medium') ? 2 : 3; // medium=2, hard=3
+
+  function minimax(state, depth, alpha, beta, toMove /* 'yellow' or 'white' */){
+    // 探索打ち切り
+    if(depth===0) return heuristic(state);
+
+    const meTurn = (toMove===ME);
+    const ms = orderedMoves(state, toMove);
+
+    if(meTurn){
+      let best = -1e9;
+      for(const [q,r] of ms){
+        const ns = applyMove(state,q,r,toMove);
+        const res = makesLose(ns,q,r,toMove);
+        let val;
+        if(res.win) val = 9999;           // 直勝ち
+        else if(res.lose) val = -9999;     // 自爆
+        else val = minimax(ns, depth-1, alpha, beta, OP);
+        best = Math.max(best, val); alpha = Math.max(alpha, val);
+        if(beta<=alpha) break; // 枝刈り
       }
+      return best;
+    }else{
+      let best = 1e9;
+      for(const [q,r] of ms){
+        const ns = applyMove(state,q,r,toMove);
+        const res = makesLose(ns,q,r,toMove);
+        let val;
+        if(res.win) val = -9999;           // 相手の直勝ちはこちらにとって最悪
+        else if(res.lose) val = 9999;      // 相手が自爆
+        else val = minimax(ns, depth-1, alpha, beta, ME);
+        best = Math.min(best, val); beta = Math.min(beta, val);
+        if(beta<=alpha) break;
+      }
+      return best;
     }
   }
-  const minX=Math.min(...xs), maxX=Math.max(...xs);
-  const minY=Math.min(...ys), maxY=Math.max(...ys);
-  const pad=70;
-  const scX=(1000-pad*2)/(maxX-minX);
-  const scY=(1000-pad*2)/(maxY-minY);
-  const scale=Math.min(scX,scY);
-  const offX=(1000-(maxX-minX)*scale)/2 - minX*scale;
-  const offY=(1000-(maxY-minY)*scale)/2 - minY*scale;
-  return {scale,offX,offY};
-}
-const L = computeLayout();
 
-/* ===== 描画 ===== */
-function render(){
-  svg.innerHTML = '';
-
-  // 1) defs と 背景を「先」に配置（＝最背面）
-  const defs = document.createElementNS("http://www.w3.org/2000/svg","defs");
-  defs.innerHTML = `
-    <radialGradient id="bgGrad" cx="50%" cy="50%" r="60%">
-      <stop offset="0%"  stop-color="#2a2c30"/>
-      <stop offset="70%" stop-color="#1d1f23"/>
-      <stop offset="100%" stop-color="#131518"/>
-    </radialGradient>`;
-  svg.appendChild(defs);
-
-  const bg = document.createElementNS("http://www.w3.org/2000/svg","circle");
-  bg.setAttribute('cx','500'); bg.setAttribute('cy','500'); bg.setAttribute('r','480');
-  bg.setAttribute('fill','url(#bgGrad)');
-  bg.setAttribute('pointer-events','none');     // ← 背景でタップを遮らない
-  svg.appendChild(bg);
-
-  // 2) グリッドと石のグループをその上に
-  const gGrid = document.createElementNS("http://www.w3.org/2000/svg","g");
-  const gStones = document.createElementNS("http://www.w3.org/2000/svg","g");
-  svg.appendChild(gGrid); svg.appendChild(gStones);
-
-  const centers = {};
-  for(let r=-RADIUS+1;r<=RADIUS-1;r++){
-    for(let q=-RADIUS+1;q<=RADIUS-1;q++){
-      if(Math.abs(q+r)<=RADIUS-1){
-        const [px,py]=axialToPixel(q,r,HEX_SIZE);
-        const cx=L.offX+px*L.scale, cy=L.offY+py*L.scale;
-        const s=HEX_SIZE*.96*L.scale;
-        const p=document.createElementNS("http://www.w3.org/2000/svg","path");
-        p.setAttribute('d',hexPath(cx,cy,s));
-        p.classList.add('hex');
-        const k=key(q,r);
-        if(!boardState.has(k)){
-          p.classList.add('empty');
-          p.addEventListener('pointerenter',()=>p.classList.add('hover'));
-          p.addEventListener('pointerleave',()=>p.classList.remove('hover'));
-          p.addEventListener('click',()=>place(q,r));
-        }else{
-          p.classList.add('blocked');
-        }
-        gGrid.appendChild(p);
-        centers[k]=[cx,cy];
-      }
-    }
+  // 探索開始
+  let bestMove = null, bestVal = -1e9;
+  const ms = orderedMoves(boardState, ME).slice(0, 14); // 候補を少し絞って高速化
+  for(const [q,r] of ms){
+    // 自爆はスキップ（保険）
+    const ns = applyMove(boardState,q,r,ME);
+    if(makesExact3(ns,q,r,ME)) continue;
+    const val = minimax(ns, DEPTH-1, -1e9, 1e9, OP);
+    if(val > bestVal){ bestVal = val; bestMove = [q,r]; }
   }
 
-  // 石
-  let last = history.length? history[history.length-1].k : null;
-  for(const [k,v] of boardState.entries()){
-    const [cx,cy]=centers[k];
-    const g=document.createElementNS("http://www.w3.org/2000/svg","g");
-    g.setAttribute('class',`stone ${v} ${k===last?'last-move':''}`);
-    const c=document.createElementNS("http://www.w3.org/2000/svg","circle");
-    c.setAttribute('cx',cx); c.setAttribute('cy',cy);
-    c.setAttribute('r',HEX_SIZE*.70*L.scale);
-    g.appendChild(c);
-    gStones.appendChild(g);
+  if(!bestMove){ // 予防線：全て同値ならランダム安全手
+    const m = moves[Math.floor(Math.random()*moves.length)];
+    return place(...m);
   }
-
-  // ヘッダ更新
-  const badge=document.getElementById('turnBadge');
-  const text=document.getElementById('turnText');
-  badge.className=`badge ${current==='white'?'b-white':'b-yellow'}`;
-  text.textContent = gameOver ? endMessage : (current==='white'?'白':'黄')+'の番です';
-  document.getElementById('undoBtn').disabled = history.length===0 || gameOver;
+  return place(...bestMove);
 }
 
-/* ===== 判定 ===== */
-function countDir(q,r,[dq,dr],pl){
-  let n=0; let cq=q, cr=r;
-  while(true){
-    cq+=dq; cr+=dr;
-    if(boardState.get(key(cq,cr))===pl) n++; else break;
-  }
-  return n;
-}
-function longest(q,r,pl){
-  let m=1;
-  for(const d of DIRS){
-    const len = 1 + countDir(q,r,d,pl) + countDir(q,r,[-d[0],-d[1]],pl);
-    if(len>m) m=len;
-  }
-  return m;
-}
-function hasExact3(q,r,pl){
-  for(const d of DIRS){
-    const len = 1 + countDir(q,r,d,pl) + countDir(q,r,[-d[0],-d[1]],pl);
-    if(len===3) return true;
-  }
-  return false;
-}
+function legalMoves(state=boardState){const arr=[];for(let r=-RADIUS+1;r<=RADIUS-1;r++)for(let q=-RADIUS+1;q<=RADIUS-1;q++)if(Math.abs(q+r)<=RADIUS-1&&!state.has(key(q,r)))arr.push([q,r]);return arr;}
 
-/* ===== プレイ処理 ===== */
-function place(q,r){
-  if(gameOver) return;
-  const k=key(q,r);
-  if(boardState.has(k)) return;
-  boardState.set(k,current);
-  history.push({k,player:current});
+document.getElementById('resetBtn').onclick=reset;
+document.getElementById('undoBtn').onclick=undo;
+document.getElementById('aiLevel').onchange=e=>{aiLevel=e.target.value;if(aiLevel!=='off'&&current==='yellow'&&!gameOver)setTimeout(aiMove,200);};
 
-  const winLen = longest(q,r,current);
-  if(winLen>=4){
-    gameOver=true; endMessage=(current==='white'?'白':'黄')+'の勝ち！（4つ以上）';
-  }else if(hasExact3(q,r,current)){
-    gameOver=true; endMessage=(current==='white'?'白':'黄')+'の負け（3を作った）';
-  }else{
-    current = (current==='white')?'yellow':'white';
-  }
-  render();
-}
-function reset(all=true){
-  boardState.clear(); history=[]; gameOver=false; endMessage='';
-  if(all) current='white';
-  render();
-}
-function undo(){
-  if(history.length===0 || gameOver) return;
-  const last=history.pop();
-  boardState.delete(last.k);
-  current = last.player;
-  gameOver=false; endMessage='';
-  render();
-}
-function swapFirst(){
-  if(history.length>0) return;
-  current = (current==='white')?'yellow':'white';
-  render();
-}
-
-/* ===== UIイベント ===== */
-document.getElementById('resetBtn').addEventListener('click',()=>reset(true));
-document.getElementById('undoBtn').addEventListener('click',undo);
-document.getElementById('swapBtn').addEventListener('click',swapFirst);
-
-/* 初期表示 */
 render();
 </script>
 </body>
